@@ -1,5 +1,6 @@
 listen_port: 9220
 timeout: 10
+auth_mode: session
 job: 'redfish-myjob'
 username: admin
 password: admin

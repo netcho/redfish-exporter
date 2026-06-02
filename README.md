@@ -104,6 +104,8 @@ docker run -d -p 9220:9220  -v ${PWD}/myconfig.yml:/redfish_exporter/config.yml 
 
 * The **timeout** parameter specifies the amount of time to wait for an answer from the server. Again this can alos be provided via TIMEOUT environment variable.
 
+* The **auth_mode** parameter specifies the authentication method. The default value `session` creates a Redfish session and uses the returned auth token. The value `basic` uses HTTP Basic authentication for Redfish requests and does not create a Redfish session. This can also be provided via the AUTH_MODE environment variable.
+
 * The **job** parameter specifies the Prometheus job that will be passed as label if no job was handed over during the API call.
 
 ### Example of a config file
@@ -113,6 +115,7 @@ listen_port: 9200
 username: <your username>
 password: <your password>
 timeout: 40
+auth_mode: session
 job: 'redfish-myjob'
 ```
 

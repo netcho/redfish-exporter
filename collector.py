@@ -72,7 +72,14 @@ class RedfishMetricsCollector:
 
         self._session_url = ""
         self._auth_token = ""
-        self._basic_auth = False
+        self._auth_mode = str(os.getenv("AUTH_MODE", config.get('auth_mode', 'session'))).strip().lower()
+        if self._auth_mode not in ["basic", "session"]:
+            logging.warning(
+                "Invalid auth_mode %s configured, falling back to session auth.",
+                self._auth_mode
+            )
+            self._auth_mode = "session"
+        self._basic_auth = self._auth_mode == "basic"
         self._session = ""
         self.redfish_version = "not available"
 
@@ -80,7 +87,7 @@ class RedfishMetricsCollector:
         """Get the url for the server info and messure the response time"""
         logging.info("Target %s: Connecting to server %s", self.target, self.host)
         start_time = time.time()
-        server_response = self.connect_server("/redfish/v1", noauth=True)
+        server_response = self.connect_server("/redfish/v1", noauth=self._auth_mode != "basic")
 
         self._response_time = round(time.time() - start_time, 2)
         logging.info("Target %s: Response time: %s seconds.", self.target, self._response_time)
@@ -102,7 +109,11 @@ class RedfishMetricsCollector:
             self.product = server_response['Product']
             logging.debug("Target %s: Product from root: %s", self.target, self.product)
 
-        for key in ["Systems", "SessionService"]:
+        required_urls = ["Systems"]
+        if self._auth_mode == "session":
+            required_urls.append("SessionService")
+
+        for key in required_urls:
             if key in server_response:
                 self.urls[key] = server_response[key]['@odata.id']
             else:
@@ -113,6 +124,11 @@ class RedfishMetricsCollector:
                     self.host
                 )
                 return
+
+        if self._auth_mode == "basic":
+            logging.info("Target %s: Using basic authentication.", self.target)
+            self._redfish_up = 1
+            return
 
         session_service = self.connect_server(
             self.urls['SessionService'],
@@ -237,9 +253,12 @@ class RedfishMetricsCollector:
         self._session.headers.update({"content-type": "application/json"})
 
         if noauth:
+            self._session.auth = None
+            self._session.headers.pop("X-Auth-Token", None)
             logging.debug("Target %s: Using no auth", self.target)
         elif basic_auth or self._basic_auth:
             self._session.auth = (self._username, self._password)
+            self._session.headers.pop("X-Auth-Token", None)
             logging.debug("Target %s: Using basic auth with user %s", self.target, self._username)
         else:
             logging.debug("Target %s: Using auth token", self.target)
